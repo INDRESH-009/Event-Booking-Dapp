@@ -30,6 +30,9 @@ export default function Profile() {
   const [hasApproval, setHasApproval] = useState(false);
   const [sellerFunds, setSellerFunds] = useState("0");
   const [organizerFunds, setOrganizerFunds] = useState("0");
+  // New state variables for modals and loader for resale listing
+  const [modal, setModal] = useState({ show: false, message: "" });
+  const [listingProcessing, setListingProcessing] = useState(false);
 
   useEffect(() => {
     if (!account || !provider) return;
@@ -148,11 +151,11 @@ export default function Profile() {
       );
       const tx = await contract.setApprovalForAll(process.env.NEXT_PUBLIC_CONTRACT_ADDRESS, true);
       await tx.wait();
-      alert("✅ Contract approved for all transfers.");
+      setModal({ show: true, message: "✅ Contract approved for all transfers." });
       setHasApproval(true);
     } catch (error) {
       console.error("❌ Error setting approval:", error);
-      alert("⚠️ Failed to set approval.");
+      setModal({ show: true, message: "⚠️ Failed to set approval." });
     }
   };
 
@@ -165,10 +168,10 @@ export default function Profile() {
       );
       const tx = await contract.withdrawSellerFunds();
       await tx.wait();
-      alert("Seller withdrawal successful!");
+      setModal({ show: true, message: "Seller withdrawal successful!" });
     } catch (error) {
       console.error("Withdrawal failed", error);
-      alert("Withdrawal failed!");
+      setModal({ show: true, message: "Withdrawal failed!" });
     }
   };
 
@@ -181,10 +184,10 @@ export default function Profile() {
       );
       const tx = await contract.withdrawOrganizerFunds();
       await tx.wait();
-      alert("Organizer withdrawal successful!");
+      setModal({ show: true, message: "Organizer withdrawal successful!" });
     } catch (error) {
       console.error("Organizer withdrawal failed", error);
-      alert("Organizer withdrawal failed!");
+      setModal({ show: true, message: "Organizer withdrawal failed!" });
     }
   };
 
@@ -211,27 +214,47 @@ export default function Profile() {
 
   const handleListForResale = async (ticketId) => {
     if (!resalePrice[ticketId] || isNaN(resalePrice[ticketId])) {
-      return alert("❌ Please enter a valid resale price.");
+      return setModal({ show: true, message: "❌ Please enter a valid resale price." });
     }
 
+    setListingProcessing(true);
     try {
-      console.log("📢 Using signer from context...");
+      console.log("📢 Listing ticket for resale...");
       const contract = new ethers.Contract(
         process.env.NEXT_PUBLIC_CONTRACT_ADDRESS,
         ["function listForSale(uint256 ticketId, uint256 price) external"],
         signer
       );
-      console.log("📢 Listing ticket for resale...");
       const tx = await contract.listForSale(ticketId, ethers.parseEther(resalePrice[ticketId].toString()));
       await tx.wait();
-
-      alert(`✅ Ticket ID ${ticketId} listed for resale at ${resalePrice[ticketId]} ETH!`);
+      setModal({ show: true, message: `✅ Ticket ID ${ticketId} listed for resale at ${resalePrice[ticketId]} ETH!` });
       setResalePrice((prev) => ({ ...prev, [ticketId]: "" }));
     } catch (error) {
       console.error("❌ Error listing ticket for resale:", error);
-      alert("⚠️ Failed to list ticket.");
+      setModal({ show: true, message: "⚠️ Failed to list ticket." });
+    } finally {
+      setListingProcessing(false);
     }
   };
+
+  const closeModal = () => {
+    setModal({ show: false, message: "" });
+  };
+
+  // Loader for listing processing
+  if (listingProcessing) {
+    return (
+      <div className="flex flex-col space-y-4 justify-center items-center bg-black h-screen">
+        <div className="flex space-x-2 justify-center items-center">
+          <span className="sr-only">Loading...</span>
+          <div className="h-8 w-8 bg-white rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+          <div className="h-8 w-8 bg-white rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+          <div className="h-8 w-8 bg-white rounded-full animate-bounce"></div>
+        </div>
+        <p className="text-white text-lg animate-pulse">Listing Ticket for Resale...</p>
+      </div>
+    );
+  }
 
   if (loading)
     return (
@@ -252,9 +275,9 @@ export default function Profile() {
     <div className="min-h-screen bg-gradient-to-br from-black via-purple-950 to-black p-6 pt-14">
       <div className="mx-auto max-w-7xl space-y-8">
         {/* Your Tickets Section */}
-        <section className="space-y-4">
+        <section className="space-y-4 mt-14">
           <div className="flex items-center gap-2">
-            <TicketIcon className="h-6 w-6 text-purple-400" />
+            <TicketIcon className="h-8 w-8 text-purple-400" />
             <h2 className="text-2xl font-bold text-white">Your Tickets</h2>
           </div>
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -421,12 +444,11 @@ export default function Profile() {
               <CardContent className="flex items-center gap-2">
                 <p className="text-2xl font-bold text-purple-400">{sellerFunds}</p>
                 <Badge variant="secondary" className="bg-purple-500/20 text-purple-200">ETH</Badge>
-                <DollarSign className="h-4 w-4 text-purple-400" />
               </CardContent>
               <CardFooter>
                 <Button
                   onClick={handleWithdrawSellerFunds}
-                  className="w-full bg-purple-500/20 backdrop-blur-sm transition-colors hover:bg-purple-500/40"
+                  className="w-full bg-purple-500 text-white hover:bg-purple-600"
                   variant="secondary"
                   disabled={parseFloat(sellerFunds) === 0}
                 >
@@ -441,7 +463,6 @@ export default function Profile() {
               <CardContent className="flex items-center gap-2">
                 <p className="text-2xl font-bold text-purple-400">{organizerFunds}</p>
                 <Badge variant="secondary" className="bg-purple-500/20 text-purple-200">ETH</Badge>
-                <DollarSign className="h-4 w-4 text-purple-400" />
               </CardContent>
               <CardFooter>
                 <Button
@@ -468,6 +489,19 @@ export default function Profile() {
           </div>
         </section>
       </div>
+
+      {/* Modal */}
+      {modal.show && (
+        <div className="fixed inset-0 flex items-center justify-center z-50">
+          <div className="fixed inset-0 bg-black opacity-50"></div>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 z-10 max-w-sm w-full">
+            <p className="text-gray-900 dark:text-gray-100 mb-4">{modal.message}</p>
+            <Button onClick={closeModal} className="w-full bg-blue-500 hover:bg-blue-600 text-white">
+              OK
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
