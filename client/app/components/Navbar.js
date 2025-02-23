@@ -26,7 +26,7 @@ export default function Navbar() {
         <NavLink href="/">Home</NavLink>
         <NavLink href="/events">Events</NavLink>
         {account && <NavLink href="/profile">Profile</NavLink>}
-        {account && <Link href="/resale">Secondary Market</Link>}
+        {account && <NavLink href="/resale">Secondary Market</NavLink>}
       </div>
 
       <div className="hidden md:flex items-center space-x-4">
