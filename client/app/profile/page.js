@@ -3,6 +3,7 @@ import { useState, useEffect, useContext } from "react";
 import { WalletContext } from "../context/WalletContext.js";
 import { ethers } from "ethers";
 import Link from "next/link";
+import { QRCodeCanvas } from "qrcode.react"; // Import the QRCode component
 
 const approvalABI = [
   "function isApprovedForAll(address owner, address operator) external view returns (bool)",
@@ -58,6 +59,8 @@ export default function Profile() {
           const eventData = await contract.events(eventId);
           const [name, description, venue, ticketPrice, maxTickets, ticketsSold, eventDate, bannerImage] = eventData;
           const resaleCount = await contract.resaleHistory(tokenId);
+          const rawResalePrice = await contract.resalePrices(tokenId);
+          const formattedResalePrice = rawResalePrice > 0 ? ethers.formatEther(rawResalePrice) : null;
 
           userTickets.push({
             id: tokenId.toString(),
@@ -69,9 +72,7 @@ export default function Profile() {
             venue,
             eventName: name,
             eventImage: bannerImage,
-            resalePrice: (await contract.resalePrices(tokenId)) > 0
-              ? ethers.formatEther(await contract.resalePrices(tokenId))
-              : null,
+            resalePrice: formattedResalePrice,
             originalPrice: ethers.formatEther(ticketPrice),
             resaleCount: Number(resaleCount)
           });
@@ -260,9 +261,18 @@ export default function Profile() {
                   rel="noopener noreferrer"
                   className="text-blue-400 underline"
                 >
-                  {ticket.transactionHash.slice(0, 15)}...
+                  {ticket.transactionHash}
                 </a>
               </p>
+              {/* QR Code for the transaction */}
+              <div className="my-4 flex justify-center">
+                <QRCodeCanvas
+                  value={`https://sepolia.etherscan.io/tx/${ticket.transactionHash}`}
+                  size={128}
+                  bgColor="#ffffff"
+                  fgColor="#000000"
+                />
+              </div>
               {ticket.resalePrice ? (
                 <p className="text-sm mb-1"><strong>Resale Price:</strong> {ticket.resalePrice} ETH</p>
               ) : (
@@ -298,7 +308,7 @@ export default function Profile() {
           ))}
         </div>
       )}
-
+  
       {/* Your Events Section */}
       <h1 className="text-3xl font-bold my-8">🎭 Your Events</h1>
       {organizerEvents.length === 0 ? (
@@ -328,10 +338,10 @@ export default function Profile() {
           ))}
         </div>
       )}
-
+  
       {/* My Withdrawal Balances Heading */}
       <h2 className="text-2xl font-bold my-6">My Withdrawal Balances</h2>
-
+  
       {/* Grouped Withdrawal and Organize Event Section */}
       <div className="flex flex-col md:flex-row gap-6">
         <div className="flex-1 bg-gray-800 rounded-xl shadow-lg p-4 flex flex-col justify-between">
@@ -368,4 +378,5 @@ export default function Profile() {
       </div>
     </div>
   );
+  
 }
