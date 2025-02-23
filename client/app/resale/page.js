@@ -3,7 +3,7 @@ import { useState, useEffect, useContext } from "react";
 import { WalletContext } from "../context/WalletContext";
 import { ethers } from "ethers";
 import Link from "next/link";
-import { useRouter } from "next/navigation"; // For Next.js 13 app directory
+import { useRouter } from "next/navigation";
 
 export default function ResaleTicketsPage() {
   const { account, provider, signer } = useContext(WalletContext);
@@ -30,13 +30,9 @@ export default function ResaleTicketsPage() {
         const ticketsData = [];
 
         for (let ticketId of ticketIds) {
-          // Get ticket details
           const [eventId, used, purchaseTimestamp, txHash] = await contract.tickets(ticketId);
-          // Get event details
           const eventData = await contract.events(eventId);
-          // Destructure event data (first eight fields)
           const [name, description, venue, ticketPrice, maxTickets, ticketsSold, eventDate, bannerImage] = eventData;
-          // Get the resale price for this ticket
           const resalePriceWei = await contract.resalePrices(ticketId);
           const resalePriceEth = ethers.formatEther(resalePriceWei);
 
@@ -66,7 +62,6 @@ export default function ResaleTicketsPage() {
   const buyResaleTicket = async (ticketId, price) => {
     if (!signer) return alert("Please connect your wallet.");
     try {
-      // Use signer from WalletContext
       const contract = new ethers.Contract(
         process.env.NEXT_PUBLIC_CONTRACT_ADDRESS,
         ["function buyResaleTicket(uint256 ticketId) external payable"],
@@ -76,7 +71,6 @@ export default function ResaleTicketsPage() {
       const tx = await contract.buyResaleTicket(ticketId, { value: ethers.parseEther(price) });
       await tx.wait();
       alert("✅ Resale ticket purchased successfully!");
-      // Redirect to the profile page after purchase
       router.push("/profile");
     } catch (error) {
       console.error("❌ Error buying resale ticket:", error);
@@ -84,44 +78,43 @@ export default function ResaleTicketsPage() {
     }
   };
 
-  if (!account) return <p>Please connect your wallet.</p>;
-  if (loading) return <p>Loading resale tickets...</p>;
-  if (resaleTickets.length === 0) return <p>No resale tickets available.</p>;
+  if (!account) return <p className="text-center text-white py-8">Please connect your wallet.</p>;
+  if (loading) return <p className="text-center text-white py-8">Loading resale tickets...</p>;
+  if (resaleTickets.length === 0) return <p className="text-center text-white py-8">No resale tickets available.</p>;
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h1>Resale Tickets</h1>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "20px" }}>
+    <div className="min-h-screen bg-black text-white px-8 py-8">
+      <h1 className="text-3xl font-bold mb-6">Resale Tickets</h1>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {resaleTickets.map((ticket) => (
-          <div key={ticket.ticketId} style={{ border: "1px solid #ccc", padding: "15px", borderRadius: "10px" }}>
+          <div key={ticket.ticketId} className="bg-gray-800 rounded-xl shadow-lg p-4">
             <img
               src={ticket.bannerImage}
               alt={ticket.eventName}
-              width="100%"
-              height="180px"
-              style={{ borderRadius: "10px", objectFit: "cover" }}
+              className="w-full h-44 object-cover rounded-lg mb-4"
             />
-            <h2>{ticket.eventName}</h2>
-            <p><strong>Ticket ID:</strong> {ticket.ticketId}</p>
-            <p><strong>Event ID:</strong> {ticket.eventId}</p>
-            <p><strong>Venue:</strong> {ticket.venue}</p>
-            <p><strong>Event Date:</strong> {ticket.eventDate}</p>
-            <p><strong>Resale Price:</strong> {ticket.resalePrice} ETH</p>
+            <h2 className="text-xl font-semibold mb-2">{ticket.eventName}</h2>
+            <p className="text-sm mb-1"><strong>Ticket ID:</strong> {ticket.ticketId}</p>
+            <p className="text-sm mb-1"><strong>Event ID:</strong> {ticket.eventId}</p>
+            <p className="text-sm mb-1"><strong>Venue:</strong> {ticket.venue}</p>
+            <p className="text-sm mb-1"><strong>Event Date:</strong> {ticket.eventDate}</p>
+            <p className="text-sm mb-1"><strong>Resale Price:</strong> {ticket.resalePrice} ETH</p>
             <button
               onClick={() => buyResaleTicket(ticket.ticketId, ticket.resalePrice)}
-              style={{ padding: "10px", backgroundColor: "orange", color: "white", border: "none", borderRadius: "5px", cursor: "pointer" }}
+              className="w-full px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded"
             >
               Buy Resale Ticket
             </button>
           </div>
         ))}
       </div>
-      <br />
-      <Link href="/profile">
-        <button style={{ padding: "10px", backgroundColor: "#007bff", color: "white", border: "none", borderRadius: "5px", cursor: "pointer" }}>
-          Back to Profile
-        </button>
-      </Link>
+      {/* <div className="mt-8">
+        <Link href="/profile">
+          <button className="w-full px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded">
+            Back to Profile
+          </button>
+        </Link>
+      </div> */}
     </div>
   );
 }
