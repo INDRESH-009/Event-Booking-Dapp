@@ -136,8 +136,8 @@ npm run dev
 This project is licensed under the **MIT License**.
 
 ## Contributors
-- **Your Name** - [GitHub](https://github.com/INDRESH-009)
-- **Collaborator Name** - [GitHub](https://github.com/haryshwa05)
+- **Indresh** - [GitHub](https://github.com/INDRESH-009)
+- **Haryshwa** - [GitHub](https://github.com/haryshwa05)
 
 ---
 _This project is under active development. Contributions are welcome!_ 🚀
