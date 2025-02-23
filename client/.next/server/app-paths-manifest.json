@@ -1,0 +1,9 @@
+{
+  "/api/upload/route": "app/api/upload/route.js",
+  "/events/page": "app/events/page.js",
+  "/profile/page": "app/profile/page.js",
+  "/organize/page": "app/organize/page.js",
+  "/event-details/[eventId]/page": "app/event-details/[eventId]/page.js",
+  "/dashboard/[eventId]/page": "app/dashboard/[eventId]/page.js",
+  "/page": "app/page.js"
+}

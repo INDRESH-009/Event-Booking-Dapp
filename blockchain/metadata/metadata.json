@@ -1,0 +1,11 @@
+{
+    "name": "VIP Event Ticket",
+    "description": "Exclusive access to VIP seats at the event.",
+    "image": "ipfs:/bafkreifnyawzuufdlzaok55wkj46xun2ui2inxnh6rlbcs4gjppm7m4fj4",
+    "attributes": [
+      { "trait_type": "Seat", "value": "A1" },
+      { "trait_type": "Date", "value": "March 10, 2025" },
+      { "trait_type": "Location", "value": "Stadium XYZ" }
+    ]
+  }
+  
