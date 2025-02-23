@@ -8,7 +8,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 contract TicketNFT is ERC721URIStorage, ERC721Enumerable, Ownable {
     uint256 public ticketCounter;
     uint256 public eventCounter;
-    uint256 public constant MAX_RESALE_PRICE = 10 ether; // Price cap for resale
     uint256 public constant ROYALTY_PERCENT = 10; // 10% royalty to organizer
 
     struct Event {
@@ -18,24 +17,26 @@ contract TicketNFT is ERC721URIStorage, ERC721Enumerable, Ownable {
         uint256 ticketPrice;
         uint256 maxTickets;
         uint256 ticketsSold;
-        uint256 eventDate; // 📅 New: Event Date
-        string bannerImage; // 🖼️ New: Event Banner
-        address organizer; // 👤 New: Organizer
-        uint256 totalEarnings; // 💰 New: Earnings Tracker
-        uint256 totalResaleEarnings; // 🔄 New: Resale Royalty Earnings
+        uint256 eventDate; 
+        string bannerImage; 
+        address organizer; 
+        uint256 totalEarnings; 
+        uint256 totalResaleEarnings;
     }
 
     struct Ticket {
         uint256 eventId;
         bool used;
-        uint256 purchaseTimestamp; // ⏳ New: Store purchase timestamp
-        string txHash; // 🔗 New: Store transaction hash
+        uint256 purchaseTimestamp; 
+        string txHash; 
     }
 
     mapping(uint256 => Event) public events;
     mapping(uint256 => Ticket) public tickets;
     mapping(uint256 => uint256) public resalePrices;
-    mapping(address => uint256[]) public organizerEvents; // Organizers' event list
+    mapping(uint256 => uint256) public resaleHistory; // Tracks how many times ticket is resold
+    mapping(uint256 => bool) public isListedForResale;
+    mapping(address => uint256[]) public organizerEvents;
 
     constructor() ERC721("EventTicket", "ETK") {
         ticketCounter = 0;
@@ -58,7 +59,7 @@ contract TicketNFT is ERC721URIStorage, ERC721Enumerable, Ownable {
         );
         organizerEvents[msg.sender].push(eventCounter);
     }
-    
+
     /** 🔎 Get Total Events */
     function getTotalEvents() external view returns (uint256) {
         return eventCounter;
@@ -92,12 +93,27 @@ contract TicketNFT is ERC721URIStorage, ERC721Enumerable, Ownable {
         return tickets[ticketId].used;
     }
 
-    /** 🔄 List Ticket for Resale */
+    /** 🔄 List Ticket for Resale with Dynamic Price Cap */
     function listForSale(uint256 ticketId, uint256 price) external {
         require(ownerOf(ticketId) == msg.sender, "Not owner");
-        require(price <= MAX_RESALE_PRICE, "Price exceeds cap");
+
+        uint256 originalPrice = events[tickets[ticketId].eventId].ticketPrice;
+        uint256 resaleCount = resaleHistory[ticketId];
+
+        uint256 maxAllowedPrice;
+        if (resaleCount == 0) {
+            maxAllowedPrice = (originalPrice * 150) / 100; // 150% for 1st resale
+        } else if (resaleCount == 1) {
+            maxAllowedPrice = (originalPrice * 175) / 100; // 175% for 2nd resale
+        } else {
+            maxAllowedPrice = (originalPrice * 200) / 100; // 200% max
+        }
+
+        require(price <= maxAllowedPrice, "Exceeds allowed resale cap");
+
         resalePrices[ticketId] = price;
-        approve(address(this), ticketId); // Allow contract to transfer
+        isListedForResale[ticketId] = true;
+        approve(address(this), ticketId);
     }
 
     /** 💰 Buy Resale Ticket */
@@ -108,56 +124,52 @@ contract TicketNFT is ERC721URIStorage, ERC721Enumerable, Ownable {
 
         address seller = ownerOf(ticketId);
         uint256 royalty = (price * ROYALTY_PERCENT) / 100;
-        payable(events[tickets[ticketId].eventId].organizer).transfer(royalty); // Royalty to organizer
+        payable(events[tickets[ticketId].eventId].organizer).transfer(royalty);
         payable(seller).transfer(price - royalty);
         
         safeTransferFrom(seller, msg.sender, ticketId);
-        resalePrices[ticketId] = 0;
         
+        resalePrices[ticketId] = 0;
+        isListedForResale[ticketId] = false;
+
+        resaleHistory[ticketId] += 1; // Increment resale count
         events[tickets[ticketId].eventId].totalResaleEarnings += royalty;
     }
 
-    /** 📊 Get Event Details */
-    function getEventDetails(uint256 eventId)
-        external
-        view
-        returns (
-            string memory name,
-            string memory description,
-            string memory venue,
-            uint256 ticketPrice,
-            uint256 maxTickets,
-            uint256 ticketsSold,
-            uint256 eventDate,
-            string memory bannerImage
-        )
-    {
-        Event memory eventDetails = events[eventId];
-        return (
-            eventDetails.name,
-            eventDetails.description,
-            eventDetails.venue,
-            eventDetails.ticketPrice,
-            eventDetails.maxTickets,
-            eventDetails.ticketsSold,
-            eventDetails.eventDate,
-            eventDetails.bannerImage
-        );
+    /** 📊 Fetch Resale Tickets */
+    function getResaleTickets() external view returns (uint256[] memory) {
+        uint256 totalTickets = ticketCounter;
+        uint256 count = 0;
+
+        for (uint256 i = 1; i <= totalTickets; i++) {
+            if (isListedForResale[i]) {
+                count++;
+            }
+        }
+
+        uint256[] memory resaleTickets = new uint256[](count);
+        count = 0;
+
+        for (uint256 i = 1; i <= totalTickets; i++) {
+            if (isListedForResale[i]) {
+                resaleTickets[count] = i;
+                count++;
+            }
+        }
+        
+        return resaleTickets;
     }
 
-    /** 🎟️ Get Ticket Details */
-    function getTicketDetails(uint256 ticketId)
-        external
-        view
-        returns (uint256 eventId, bool used, uint256 purchaseTimestamp, string memory txHash)
-    {
-        require(_exists(ticketId), "Ticket does not exist");
-        return (
-            tickets[ticketId].eventId,
-            tickets[ticketId].used,
-            tickets[ticketId].purchaseTimestamp,
-            tickets[ticketId].txHash
-        );
+    /** 💵 Withdraw Resale Royalties */
+    function withdrawResaleRoyalties(uint256 eventId) external {
+        Event storage eventDetails = events[eventId];
+        require(msg.sender == eventDetails.organizer, "Not the event organizer");
+        require(eventDetails.totalResaleEarnings > 0, "No resale earnings to withdraw");
+
+        uint256 amount = eventDetails.totalResaleEarnings;
+        eventDetails.totalResaleEarnings = 0;
+
+        payable(msg.sender).transfer(amount);
     }
 
     /** 📈 Get Organizer's Events */
@@ -179,6 +191,17 @@ contract TicketNFT is ERC721URIStorage, ERC721Enumerable, Ownable {
         override(ERC721Enumerable, ERC721)
     {
         super._beforeTokenTransfer(from, to, tokenId, batchSize);
+    }
+
+    function withdrawEarnings(uint256 eventId) external {
+        Event storage eventDetails = events[eventId];
+        require(msg.sender == eventDetails.organizer, "Not the event organizer");
+        require(eventDetails.totalEarnings > 0, "No earnings to withdraw");
+
+        uint256 amount = eventDetails.totalEarnings;
+        eventDetails.totalEarnings = 0;
+
+        payable(msg.sender).transfer(amount);
     }
 
     function supportsInterface(bytes4 interfaceId)

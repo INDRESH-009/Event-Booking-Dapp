@@ -4,6 +4,12 @@ import { useRouter, useParams } from "next/navigation";
 import { WalletContext } from "../../context/WalletContext";
 import { ethers } from "ethers";
 
+const contractABI = [
+  "function getEventDetails(uint256 eventId) external view returns (string, string, string, uint256, uint256, uint256, uint256, string)",
+  "function withdrawEarnings(uint256 eventId) external",
+  "function events(uint256 eventId) external view returns (string, string, string, uint256, uint256, uint256, uint256, string, address, uint256, uint256)"
+];
+
 export default function DashboardPage() {
   const { account, provider } = useContext(WalletContext);
   const { eventId } = useParams();
@@ -11,6 +17,9 @@ export default function DashboardPage() {
 
   const [loading, setLoading] = useState(true);
   const [eventData, setEventData] = useState(null);
+  const [organizer, setOrganizer] = useState(null);
+  const [totalEarnings, setTotalEarnings] = useState("0");
+  const [withdrawLoading, setWithdrawLoading] = useState(false);
 
   useEffect(() => {
     if (!provider || !eventId) return;
@@ -19,15 +28,12 @@ export default function DashboardPage() {
       try {
         const contract = new ethers.Contract(
           process.env.NEXT_PUBLIC_CONTRACT_ADDRESS,
-          [
-            // getEventDetails returns (in order):
-            //  name, description, venue, ticketPrice, maxTickets, ticketsSold, eventDate, bannerImage
-            "function getEventDetails(uint256 eventId) external view returns (string, string, string, uint256, uint256, uint256, uint256, string)"
-          ],
+          contractABI,
           provider
         );
 
         const details = await contract.getEventDetails(eventId);
+        const eventInfo = await contract.events(eventId);
 
         // Destructure the result:
         const name = details[0];
@@ -39,13 +45,12 @@ export default function DashboardPage() {
         const eventDateRaw = details[6];   // BigInt
         const bannerImage = details[7];
 
-        // Convert for display
-        const ticketPriceEth = ethers.formatEther(ticketPriceWei); // e.g. "0.01"
+        const ticketPriceEth = ethers.formatEther(ticketPriceWei); // Convert to ETH
         const dateStr = new Date(Number(eventDateRaw) * 1000).toLocaleString();
-
-        // Calculate total earnings on the spot:
-        // (ticketsSold * ticketPriceWei) => BigInt, then format to ETH
-        const totalEarningsWei = BigInt(ticketsSold) * ticketPriceWei;
+        
+        // Fetch actual earnings from the smart contract
+        const organizerAddress = eventInfo[8];
+        const totalEarningsWei = eventInfo[9];
         const totalEarningsEth = ethers.formatEther(totalEarningsWei);
 
         setEventData({
@@ -58,9 +63,10 @@ export default function DashboardPage() {
           ticketsSold,
           eventDate: dateStr,
           bannerImage,
-          totalEarningsEth, // Calculated on the front end
         });
 
+        setOrganizer(organizerAddress);
+        setTotalEarnings(totalEarningsEth);
         setLoading(false);
       } catch (err) {
         console.error("❌ Error fetching event data:", err);
@@ -70,6 +76,31 @@ export default function DashboardPage() {
 
     fetchEventData();
   }, [provider, eventId]);
+
+  // Withdraw function
+  const withdrawEarnings = async () => {
+    if (!window.ethereum) return alert("Connect to MetaMask");
+
+    setWithdrawLoading(true);
+    try {
+      const signer = await provider.getSigner();
+      const contract = new ethers.Contract(
+        process.env.NEXT_PUBLIC_CONTRACT_ADDRESS,
+        contractABI,
+        signer
+      );
+
+      const tx = await contract.withdrawEarnings(eventId);
+      await tx.wait();
+
+      alert("✅ Withdraw successful!");
+      setTotalEarnings("0"); // Reset earnings after withdrawal
+    } catch (error) {
+      console.error("❌ Withdrawal failed:", error);
+      alert("Withdrawal failed!");
+    }
+    setWithdrawLoading(false);
+  };
 
   // 1) Check wallet
   if (!account) return <p>Please connect your wallet.</p>;
@@ -94,8 +125,16 @@ export default function DashboardPage() {
       <p><strong>Ticket Price:</strong> {eventData.ticketPriceEth} ETH</p>
       <p><strong>Max Tickets:</strong> {eventData.maxTickets.toString()}</p>
       <p><strong>Tickets Sold:</strong> {eventData.ticketsSold.toString()}</p>
-      {/* Display your on-the-spot calculation */}
-      <p><strong>Total Earnings (Front-End Calc):</strong> {eventData.totalEarningsEth} ETH</p>
+
+      {/* Display Actual Earnings from Smart Contract */}
+      <p><strong>Total Earnings (Smart Contract):</strong> {totalEarnings} ETH</p>
+
+      {/* Show Withdraw Button Only If Organizer */}
+      {account.toLowerCase() === organizer?.toLowerCase() && (
+        <button onClick={withdrawEarnings} disabled={withdrawLoading || totalEarnings === "0"}>
+          {withdrawLoading ? "Processing..." : "Withdraw Earnings"}
+        </button>
+      )}
     </div>
   );
 }
