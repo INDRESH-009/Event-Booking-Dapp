@@ -3,7 +3,6 @@ import { useState, useEffect, useContext } from "react";
 import { WalletContext } from "../../context/WalletContext";
 import { useRouter, useParams } from "next/navigation";
 import { ethers } from "ethers";
-// ✅ Import the named export from qrcode.react, e.g. QRCodeSVG:
 import { QRCodeSVG } from "qrcode.react";
 
 export default function EventDetails() {
@@ -25,25 +24,18 @@ export default function EventDetails() {
         const contract = new ethers.Contract(
           process.env.NEXT_PUBLIC_CONTRACT_ADDRESS,
           [
-            // getEventDetails returns:
-            // name, description, venue, ticketPrice, maxTickets, ticketsSold, eventDate, bannerImage
-            "function getEventDetails(uint256 eventId) external view returns (string memory, string memory, string memory, uint256, uint256, uint256, uint256, string memory)"
+            // Use the auto-generated getter for events mapping
+            "function events(uint256) external view returns (string name, string description, string venue, uint256 ticketPrice, uint256 maxTickets, uint256 ticketsSold, uint256 eventDate, string bannerImage, address organizer, uint256 totalEarnings, uint256 totalResaleEarnings)"
           ],
           provider
         );
 
         console.log("📢 Fetching event details...");
-        const details = await contract.getEventDetails(eventId);
+        const details = await contract.events(eventId);
 
-        const name = details[0];
-        const description = details[1];
-        const venue = details[2];
-        const ticketPriceRaw = details[3]; // BigInt value (wei)
-        const maxTickets = details[4];
-        const ticketsSold = details[5];
-        const eventDateRaw = details[6];   // BigInt (seconds)
-        const image = details[7];
-
+        // Destructure the first eight values for display
+        const [name, description, venue, ticketPriceRaw, maxTickets, ticketsSold, eventDateRaw, bannerImage] = details;
+        
         // Format for display
         const ticketPrice = ethers.formatEther(ticketPriceRaw) + " ETH";
         const eventDate = new Date(Number(eventDateRaw) * 1000).toLocaleString();
@@ -58,7 +50,7 @@ export default function EventDetails() {
           maxTickets,
           ticketsSold,
           eventDate,
-          image,
+          image: bannerImage,
         });
 
         setTicketsAvailable(available);
@@ -87,7 +79,7 @@ export default function EventDetails() {
       const contract = new ethers.Contract(
         process.env.NEXT_PUBLIC_CONTRACT_ADDRESS,
         [
-          // buyTicket includes the txHash parameter
+          // buyTicket function with txHash parameter
           "function buyTicket(uint256 eventId, string memory metadataURI, string memory txHash) external payable"
         ],
         signer
@@ -174,7 +166,6 @@ export default function EventDetails() {
         <div style={{ marginTop: "20px" }}>
           <p><strong>Transaction Hash:</strong> {transactionHash}</p>
           <p><strong>QR Code for Ticket:</strong></p>
-          {/* ✅ Use QRCodeSVG (or QRCodeCanvas) from 'qrcode.react' */}
           <QRCodeSVG value={transactionHash} size={150} />
         </div>
       )}

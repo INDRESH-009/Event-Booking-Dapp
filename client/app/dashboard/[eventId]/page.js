@@ -1,13 +1,13 @@
 "use client";
-import { useContext, useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { WalletContext } from "../../context/WalletContext";
 import { ethers } from "ethers";
 
 const contractABI = [
-  "function getEventDetails(uint256 eventId) external view returns (string, string, string, uint256, uint256, uint256, uint256, string)",
-  "function withdrawEarnings(uint256 eventId) external",
-  "function events(uint256 eventId) external view returns (string, string, string, uint256, uint256, uint256, uint256, string, address, uint256, uint256)"
+  // Remove getEventDetails from the ABI and use the auto-generated getter:
+  "function events(uint256 eventId) external view returns (string, string, string, uint256, uint256, uint256, uint256, string, address, uint256, uint256)",
+  "function withdrawEarnings(uint256 eventId) external"
 ];
 
 export default function DashboardPage() {
@@ -32,25 +32,14 @@ export default function DashboardPage() {
           provider
         );
 
-        const details = await contract.getEventDetails(eventId);
+        // Use the auto-generated getter for events:
         const eventInfo = await contract.events(eventId);
 
-        // Destructure the result:
-        const name = details[0];
-        const description = details[1];
-        const venue = details[2];
-        const ticketPriceWei = details[3]; // BigInt
-        const maxTickets = details[4];
-        const ticketsSold = details[5];
-        const eventDateRaw = details[6];   // BigInt
-        const bannerImage = details[7];
-
-        const ticketPriceEth = ethers.formatEther(ticketPriceWei); // Convert to ETH
-        const dateStr = new Date(Number(eventDateRaw) * 1000).toLocaleString();
+        // Destructure the values (we only use the first eight for display)
+        const [name, description, venue, ticketPriceWei, maxTickets, ticketsSold, eventDateRaw, bannerImage, organizerAddress, totalEarningsWei] = eventInfo;
         
-        // Fetch actual earnings from the smart contract
-        const organizerAddress = eventInfo[8];
-        const totalEarningsWei = eventInfo[9];
+        const ticketPriceEth = ethers.formatEther(ticketPriceWei);
+        const dateStr = new Date(Number(eventDateRaw) * 1000).toLocaleString();
         const totalEarningsEth = ethers.formatEther(totalEarningsWei);
 
         setEventData({
@@ -77,7 +66,6 @@ export default function DashboardPage() {
     fetchEventData();
   }, [provider, eventId]);
 
-  // Withdraw function
   const withdrawEarnings = async () => {
     if (!window.ethereum) return alert("Connect to MetaMask");
 
@@ -94,7 +82,7 @@ export default function DashboardPage() {
       await tx.wait();
 
       alert("✅ Withdraw successful!");
-      setTotalEarnings("0"); // Reset earnings after withdrawal
+      setTotalEarnings("0");
     } catch (error) {
       console.error("❌ Withdrawal failed:", error);
       alert("Withdrawal failed!");
@@ -102,11 +90,8 @@ export default function DashboardPage() {
     setWithdrawLoading(false);
   };
 
-  // 1) Check wallet
   if (!account) return <p>Please connect your wallet.</p>;
-  // 2) Loading state
   if (loading) return <p>Loading event data...</p>;
-  // 3) If no data, show error
   if (!eventData) return <p>Event not found.</p>;
 
   return (
@@ -126,10 +111,8 @@ export default function DashboardPage() {
       <p><strong>Max Tickets:</strong> {eventData.maxTickets.toString()}</p>
       <p><strong>Tickets Sold:</strong> {eventData.ticketsSold.toString()}</p>
 
-      {/* Display Actual Earnings from Smart Contract */}
       <p><strong>Total Earnings (Smart Contract):</strong> {totalEarnings} ETH</p>
 
-      {/* Show Withdraw Button Only If Organizer */}
       {account.toLowerCase() === organizer?.toLowerCase() && (
         <button onClick={withdrawEarnings} disabled={withdrawLoading || totalEarnings === "0"}>
           {withdrawLoading ? "Processing..." : "Withdraw Earnings"}

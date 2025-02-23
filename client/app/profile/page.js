@@ -1,15 +1,23 @@
 "use client";
+const approvalABI = [
+  "function isApprovedForAll(address owner, address operator) external view returns (bool)",
+  "function setApprovalForAll(address operator, bool approved) external"
+];
+
 import { useState, useEffect, useContext } from "react";
 import { WalletContext } from "../context/WalletContext.js";
 import { ethers } from "ethers";
 import Link from "next/link";
 
+
 export default function Profile() {
-  const { account, provider } = useContext(WalletContext);
+  const { account, provider, signer } = useContext(WalletContext);
   const [tickets, setTickets] = useState([]);
   const [organizerEvents, setOrganizerEvents] = useState([]);
   const [resalePrice, setResalePrice] = useState({});
   const [loading, setLoading] = useState(true);
+  const [hasApproval, setHasApproval] = useState(false);
+
 
   useEffect(() => {
     if (!account || !provider) return;
@@ -24,13 +32,20 @@ export default function Profile() {
           [
             "function balanceOf(address owner) external view returns (uint256)",
             "function tokenOfOwnerByIndex(address owner, uint256 index) external view returns (uint256)",
-            "function getTicketDetails(uint256 ticketId) external view returns (uint256, bool, uint256, string memory)",
+            // Use auto-generated getters:
+            "function tickets(uint256 ticketId) external view returns (uint256 eventId, bool used, uint256 purchaseTimestamp, string txHash)",
+            "function events(uint256 eventId) external view returns (string name, string description, string venue, uint256 ticketPrice, uint256 maxTickets, uint256 ticketsSold, uint256 eventDate, string bannerImage, address organizer, uint256 totalEarnings, uint256 totalResaleEarnings)",
             "function getOrganizerEvents(address organizer) external view returns (uint256[])",
-            "function getEventDetails(uint256 eventId) external view returns (string memory, string memory, string memory, uint256, uint256, uint256, uint256, string memory)",
-            "function resalePrices(uint256 ticketId) external view returns (uint256)"
+            "function resalePrices(uint256 ticketId) external view returns (uint256)",
+            "function resaleHistory(uint256 ticketId) external view returns (uint256)",
+            // Add these lines along with your other ABI definitions:
+            "function isApprovedForAll(address owner, address operator) external view returns (bool)",
+            "function setApprovalForAll(address operator, bool approved) external"
+
           ],
           signer
         );
+        
 
         console.log("📢 Fetching ticket count...");
         const ticketCount = await contract.balanceOf(account);
@@ -39,9 +54,15 @@ export default function Profile() {
         for (let i = 0; i < ticketCount; i++) {
           const tokenId = await contract.tokenOfOwnerByIndex(account, i);
           console.log(`📢 Fetching details for Ticket ID ${tokenId.toString()}...`);
-          const [eventId, used, purchaseTimestamp, txHash] = await contract.getTicketDetails(tokenId);
-          const price = await contract.resalePrices(tokenId);
-          const eventDetails = await contract.getEventDetails(eventId);
+          // Fetch ticket details from the tickets mapping
+          const [eventId, used, purchaseTimestamp, txHash] = await contract.tickets(tokenId);
+          // Fetch event details from the events mapping
+          const eventData = await contract.events(eventId);
+          // Destructure only the needed fields (first eight)
+          const [name, description, venue, ticketPrice, maxTickets, ticketsSold, eventDate, bannerImage] = eventData;
+
+          // Fetch the resale count for this ticket
+          const resaleCount = await contract.resaleHistory(tokenId);
 
           userTickets.push({
             id: tokenId.toString(),
@@ -49,29 +70,35 @@ export default function Profile() {
             used,
             transactionHash: txHash,
             purchaseDate: new Date(Number(purchaseTimestamp) * 1000).toLocaleString(),
-            eventDate: new Date(Number(eventDetails[6]) * 1000).toLocaleString(),
-            venue: eventDetails[2],
-            eventName: eventDetails[0],
-            eventImage: eventDetails[7],
-            resalePrice: price > 0 ? ethers.formatEther(price) : null
+            eventDate: new Date(Number(eventDate) * 1000).toLocaleString(),
+            venue,
+            eventName: name,
+            eventImage: bannerImage,
+            resalePrice: (await contract.resalePrices(tokenId)) > 0 ? ethers.formatEther(await contract.resalePrices(tokenId)) : null,
+            // New properties:
+            originalPrice: ethers.formatEther(ticketPrice),
+            resaleCount: Number(resaleCount)
           });
+
         }
 
         console.log("📢 Fetching organizer's events...");
         const eventsCreated = await contract.getOrganizerEvents(account);
         let createdEvents = [];
         for (let eventId of eventsCreated) {
-          const event = await contract.getEventDetails(eventId);
+          // Use the auto-generated getter for events
+          const eventData = await contract.events(eventId);
+          const [name, description, venue, ticketPrice, maxTickets, ticketsSold, eventDate, bannerImage] = eventData;
           createdEvents.push({
             id: eventId.toString(),
-            name: event[0],
-            description: event[1],
-            ticketPrice: ethers.formatEther(event[3]) + " ETH",
-            maxTickets: event[4],
-            ticketsSold: event[5],
-            eventDate: new Date(Number(event[6]) * 1000).toLocaleString(),
-            venue: event[2],
-            image: event[7],
+            name,
+            description,
+            ticketPrice: ethers.formatEther(ticketPrice) + " ETH",
+            maxTickets,
+            ticketsSold,
+            eventDate: new Date(Number(eventDate) * 1000).toLocaleString(),
+            venue,
+            image: bannerImage,
           });
         }
 
@@ -87,24 +114,67 @@ export default function Profile() {
     fetchUserTicketsAndEvents();
   }, [account, provider]);
 
+  const handleSetApprovalForAll = async () => {
+    try {
+      console.log("📢 Setting global approval for contract...");
+      // Create a contract instance using the approvalABI and your signer
+      const contract = new ethers.Contract(
+        process.env.NEXT_PUBLIC_CONTRACT_ADDRESS,
+        approvalABI,
+        signer
+      );
+      const tx = await contract.setApprovalForAll(process.env.NEXT_PUBLIC_CONTRACT_ADDRESS, true);
+      await tx.wait();
+      alert("✅ Contract approved for all transfers.");
+      // Optionally, update local state to indicate approval is set.
+      setHasApproval(true);
+    } catch (error) {
+      console.error("❌ Error setting approval:", error);
+      alert("⚠️ Failed to set approval.");
+    }
+  };
+  
+  useEffect(() => {
+    if (!account || !provider) return;
+    
+    async function checkApproval() {
+      try {
+        // Use a contract instance with the approval ABI for the check.
+        const contract = new ethers.Contract(
+          process.env.NEXT_PUBLIC_CONTRACT_ADDRESS,
+          approvalABI,
+          provider
+        );
+        const approved = await contract.isApprovedForAll(account, process.env.NEXT_PUBLIC_CONTRACT_ADDRESS);
+        setHasApproval(approved);
+        console.log("Global approval status:", approved);
+      } catch (error) {
+        console.error("Error checking approval:", error);
+      }
+    }
+    
+    checkApproval();
+  }, [account, provider]);
+  
+
   const handleListForResale = async (ticketId) => {
     if (!resalePrice[ticketId] || isNaN(resalePrice[ticketId])) {
       return alert("❌ Please enter a valid resale price.");
     }
-
+  
     try {
-      console.log("📢 Getting signer...");
-      const signer = provider.getSigner();
+      console.log("📢 Using signer from context...");
+      // Create a contract instance with the signer (not provider)
       const contract = new ethers.Contract(
         process.env.NEXT_PUBLIC_CONTRACT_ADDRESS,
         ["function listForSale(uint256 ticketId, uint256 price) external"],
         signer
       );
-
+  
       console.log("📢 Listing ticket for resale...");
       const tx = await contract.listForSale(ticketId, ethers.parseEther(resalePrice[ticketId].toString()));
       await tx.wait();
-
+  
       alert(`✅ Ticket ID ${ticketId} listed for resale at ${resalePrice[ticketId]} ETH!`);
       setResalePrice((prev) => ({ ...prev, [ticketId]: "" })); // Reset input field
     } catch (error) {
@@ -141,43 +211,138 @@ export default function Profile() {
               </p>
 
               {ticket.resalePrice ? (
-                <p><strong>Resale Price:</strong> {ticket.resalePrice} ETH</p>
-              ) : (
-                <>
-                  <input
-                    type="number"
-                    placeholder="Set resale price (ETH)"
-                    className="border p-2 rounded my-2"
-                    value={resalePrice[ticket.id] || ""}
-                    onChange={(e) => setResalePrice({ ...resalePrice, [ticket.id]: e.target.value })}
-                  />
-                  <button
-                    onClick={() => handleListForResale(ticket.id)}
-                    style={{
-                      padding: "10px",
-                      backgroundColor: "orange",
-                      color: "white",
-                      border: "none",
-                      borderRadius: "5px",
-                      cursor: "pointer",
-                      marginTop: "10px"
-                    }}
-                  >
-                    List for Resale
-                  </button>
-                </>
-              )}
+  <p><strong>Resale Price:</strong> {ticket.resalePrice} ETH</p>
+) : (
+  <>
+    {/* If global approval is not set, display a button to approve */}
+    {!hasApproval && (
+      <button
+        onClick={handleSetApprovalForAll}
+        style={{
+          padding: "8px",
+          backgroundColor: "#6c757d",
+          color: "white",
+          border: "none",
+          borderRadius: "5px",
+          cursor: "pointer",
+          marginBottom: "5px"
+        }}
+      >
+        Approve for Resale
+      </button>
+    )}
+    {hasApproval && (
+      <>
+        <input
+          type="number"
+          placeholder="Set resale price (ETH)"
+          className="border p-2 rounded my-2"
+          value={resalePrice[ticket.id] || ""}
+          onChange={(e) => setResalePrice({ ...resalePrice, [ticket.id]: e.target.value })}
+        />
+        <button
+          onClick={() => handleListForResale(ticket.id)}
+          style={{
+            padding: "10px",
+            backgroundColor: "orange",
+            color: "white",
+            border: "none",
+            borderRadius: "5px",
+            cursor: "pointer",
+            marginTop: "10px"
+          }}
+        >
+          List for Resale
+        </button>
+      </>
+    )}
+  </>
+)}
+
+
             </div>
           ))}
         </div>
       )}
 
-      <h1 style={{ marginTop: "30px" }}>🎭 Your Events</h1>
-      <Link href="/organize">
-        <button style={{ padding: "10px", backgroundColor: "#28a745", color: "white", border: "none", borderRadius: "5px", cursor: "pointer", marginBottom: "20px" }}>
-          ➕ Organize an Event
-        </button>
-      </Link>
+<h1 style={{ marginTop: "30px" }}>🎭 Your Events</h1>
+{organizerEvents.length === 0 ? (
+  <p>You haven't organized any events yet.</p>
+) : (
+  <div
+    style={{
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+      gap: "20px",
+    }}
+  >
+    {organizerEvents.map((event) => (
+      <div
+        key={event.id}
+        style={{
+          border: "1px solid #ccc",
+          padding: "15px",
+          borderRadius: "10px",
+        }}
+      >
+        <img
+          src={event.image}
+          alt={event.name}
+          width="100%"
+          height="180px"
+          style={{ borderRadius: "10px", objectFit: "cover" }}
+        />
+        <h2>{event.name}</h2>
+        <p>
+          <strong>Ticket Price:</strong> {event.ticketPrice}
+        </p>
+        <p>
+          <strong>Venue:</strong> {event.venue}
+        </p>
+        <p>
+          <strong>Date:</strong> {event.eventDate}
+        </p>
+        <p>
+          <strong>Tickets Sold:</strong> {event.ticketsSold} /{" "}
+          {event.maxTickets}
+        </p>
+        {/* Dashboard Button */}
+        <Link href={`/dashboard/${event.id}`} style={{ textDecoration: "none" }}>
+          <button
+            style={{
+              padding: "10px",
+              backgroundColor: "#007bff",
+              color: "white",
+              border: "none",
+              borderRadius: "5px",
+              cursor: "pointer",
+              marginTop: "10px",
+            }}
+          >
+            Dashboard
+          </button>
+        </Link>
+      </div>
+    ))}
+  </div>
+)}
+<Link href="/organize">
+  <button
+    style={{
+      padding: "10px",
+      backgroundColor: "#28a745",
+      color: "white",
+      border: "none",
+      borderRadius: "5px",
+      cursor: "pointer",
+      marginTop: "20px",
+    }}
+  >
+    ➕ Organize an Event
+  </button>
+</Link>
+
+
     </div>
   );
 }

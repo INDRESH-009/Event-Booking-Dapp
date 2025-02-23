@@ -11,6 +11,7 @@ export default function Navbar() {
       <Link href="/">Home</Link>
       <Link href="/events">Events</Link>
       {account && <Link href="/profile">Profile</Link>}
+      {account && <Link href="/resale">Secondary Market</Link>}
     </nav>
   );
 }

@@ -19,7 +19,8 @@ export default function EventsPage() {
           process.env.NEXT_PUBLIC_CONTRACT_ADDRESS,
           [
             "function getTotalEvents() external view returns (uint256)",
-            "function getEventDetails(uint256 eventId) external view returns (string memory, string memory, string memory, uint256, uint256, uint256, uint256, string memory)"
+            // Use the auto-generated getter for events mapping:
+            "function events(uint256 eventId) external view returns (string name, string description, string venue, uint256 ticketPrice, uint256 maxTickets, uint256 ticketsSold, uint256 eventDate, string bannerImage, address organizer, uint256 totalEarnings, uint256 totalResaleEarnings)"
           ],
           provider
         );
@@ -30,18 +31,20 @@ export default function EventsPage() {
 
         for (let i = 1; i <= totalEvents; i++) {
           console.log(`📢 Fetching details for Event ID ${i}...`);
-          const event = await contract.getEventDetails(i);
-
+          const eventData = await contract.events(i);
+          // Destructure the first eight values for display
+          const [name, description, venue, ticketPrice, maxTickets, ticketsSold, eventDate, bannerImage] = eventData;
+          
           fetchedEvents.push({
             id: i,
-            name: event[0],
-            description: event[1],
-            venue: event[2],
-            ticketPrice: ethers.formatEther(event[3]) + " ETH",
-            maxTickets: event[4],
-            ticketsSold: event[5],
-            eventDate: event[6],
-            image: event[7]
+            name,
+            description,
+            venue,
+            ticketPrice: ethers.formatEther(ticketPrice) + " ETH",
+            maxTickets,
+            ticketsSold,
+            eventDate: new Date(Number(eventDate) * 1000).toLocaleString(),
+            image: bannerImage
           });
         }
 
