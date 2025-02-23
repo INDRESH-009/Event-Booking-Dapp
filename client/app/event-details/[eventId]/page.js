@@ -125,7 +125,7 @@ export default function EventDetails() {
     return <p className="text-center text-white py-8">Please connect your wallet.</p>;
 
   return (
-    <div className="min-h-screen bg-black text-white px-8 py-8 relative">
+    <div className="min-h-screen bg-black text-white px-8 py-8 pt-24 relative">
       {/* Main Card */}
       <div className="max-w-4xl mx-auto bg-gray-800 rounded-xl shadow-lg overflow-hidden">
         <div className="flex flex-col md:flex-row">

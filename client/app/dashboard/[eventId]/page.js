@@ -3,9 +3,13 @@ import { useState, useEffect, useContext } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { WalletContext } from "../../context/WalletContext";
 import { ethers } from "ethers";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import Image from "next/image";
+import { Calendar as CalendarIcon, MapPin, DollarSign, Ticket as TicketIcon } from "lucide-react";
 
 const contractABI = [
-  // Remove getEventDetails from the ABI and use the auto-generated getter:
+  // Using auto-generated getter for events:
   "function events(uint256 eventId) external view returns (string, string, string, uint256, uint256, uint256, uint256, string, address, uint256, uint256)",
   "function withdrawEarnings(uint256 eventId) external"
 ];
@@ -32,10 +36,10 @@ export default function DashboardPage() {
           provider
         );
 
-        // Use the auto-generated getter for events:
+        // Fetch event details using the auto-generated getter:
         const eventInfo = await contract.events(eventId);
 
-        // Destructure the values (we only use the first eight for display)
+        // Destructure the values (we use the first eight for display)
         const [name, description, venue, ticketPriceWei, maxTickets, ticketsSold, eventDateRaw, bannerImage, organizerAddress, totalEarningsWei] = eventInfo;
         
         const ticketPriceEth = ethers.formatEther(ticketPriceWei);
@@ -46,7 +50,6 @@ export default function DashboardPage() {
           name,
           description,
           venue,
-          ticketPriceWei,
           ticketPriceEth,
           maxTickets,
           ticketsSold,
@@ -90,34 +93,59 @@ export default function DashboardPage() {
     setWithdrawLoading(false);
   };
 
-  if (!account) return <p>Please connect your wallet.</p>;
-  if (loading) return <p>Loading event data...</p>;
-  if (!eventData) return <p>Event not found.</p>;
+  if (!account) return <p className="text-center text-white py-8">Please connect your wallet.</p>;
+  if (loading) return <p className="text-center text-white py-8">Loading event data...</p>;
+  if (!eventData) return <p className="text-center text-white py-8">Event not found.</p>;
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h1>Event Dashboard (ID: {eventId})</h1>
-      <img
-        src={eventData.bannerImage}
-        alt="Banner"
-        style={{ width: "300px", borderRadius: "10px" }}
-      />
-
-      <p><strong>Name:</strong> {eventData.name}</p>
-      <p><strong>Description:</strong> {eventData.description}</p>
-      <p><strong>Venue:</strong> {eventData.venue}</p>
-      <p><strong>Date:</strong> {eventData.eventDate}</p>
-      <p><strong>Ticket Price:</strong> {eventData.ticketPriceEth} ETH</p>
-      <p><strong>Max Tickets:</strong> {eventData.maxTickets.toString()}</p>
-      <p><strong>Tickets Sold:</strong> {eventData.ticketsSold.toString()}</p>
-
-      <p><strong>Total Earnings (Smart Contract):</strong> {totalEarnings} ETH</p>
-
-      {account.toLowerCase() === organizer?.toLowerCase() && (
-        <button onClick={withdrawEarnings} disabled={withdrawLoading || totalEarnings === "0"}>
-          {withdrawLoading ? "Processing..." : "Withdraw Earnings"}
-        </button>
-      )}
+    <div className="min-h-screen bg-gradient-to-br from-black via-purple-950 to-black text-white p-6 pt-24">
+      <Card className="max-w-4xl border-none mx-auto bg-black/40 backdrop-blur-xl rounded-xl shadow-lg">
+        <CardHeader className="relative h-64">
+          <Image
+            src={eventData.bannerImage}
+            alt={eventData.name}
+            fill
+            className="object-cover rounded-t-xl"
+          />
+        </CardHeader>
+        <CardContent className="p-6 space-y-4">
+          <CardTitle className="text-3xl font-bold">{eventData.name}</CardTitle>
+          <p className="text-gray-300">{eventData.description}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-300">
+            <div className="flex items-center gap-2">
+              <MapPin className="w-5 h-5 text-purple-400" />
+              <span><strong>Venue:</strong> {eventData.venue}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CalendarIcon className="w-5 h-5 text-purple-400" />
+              <span><strong>Date:</strong> {eventData.eventDate}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <DollarSign className="w-5 h-5 text-purple-400" />
+              <span><strong>Ticket Price:</strong> {eventData.ticketPriceEth} ETH</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <TicketIcon className="w-5 h-5 text-purple-400" />
+              <span><strong>Tickets Sold:</strong> {eventData.ticketsSold} / {eventData.maxTickets}</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-gray-300">
+            <DollarSign className="w-5 h-5 text-purple-400" />
+            <span><strong>Total Earnings:</strong> {totalEarnings} ETH</span>
+          </div>
+        </CardContent>
+        {account.toLowerCase() === organizer?.toLowerCase() && (
+          <CardFooter className="p-6">
+            <Button
+              onClick={withdrawEarnings}
+              disabled={withdrawLoading || totalEarnings === "0"}
+              className="w-full bg-purple-500 text-white hover:bg-purple-600"
+            >
+              {withdrawLoading ? "Processing..." : "Withdraw Earnings"}
+            </Button>
+          </CardFooter>
+        )}
+      </Card>
     </div>
   );
 }

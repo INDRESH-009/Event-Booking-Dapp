@@ -2,7 +2,6 @@
 import { useState, useEffect, useContext } from "react";
 import { WalletContext } from "../context/WalletContext";
 import { ethers } from "ethers";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Ticket as TicketIcon, Calendar as CalendarIcon, MapPin, DollarSign, Hash } from "lucide-react";
 
@@ -10,6 +9,9 @@ export default function ResaleTicketsPage() {
   const { account, provider, signer } = useContext(WalletContext);
   const [resaleTickets, setResaleTickets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [paymentProcessing, setPaymentProcessing] = useState(false);
+  // modal now also includes a redirect flag
+  const [modal, setModal] = useState({ show: false, message: "", redirect: false });
   const router = useRouter();
 
   useEffect(() => {
@@ -61,7 +63,9 @@ export default function ResaleTicketsPage() {
   }, [provider]);
 
   const buyResaleTicket = async (ticketId, price) => {
-    if (!signer) return alert("Please connect your wallet.");
+    if (!signer)
+      return setModal({ show: true, message: "Please connect your wallet.", redirect: false });
+    setPaymentProcessing(true);
     try {
       const contract = new ethers.Contract(
         process.env.NEXT_PUBLIC_CONTRACT_ADDRESS,
@@ -71,15 +75,41 @@ export default function ResaleTicketsPage() {
       console.log("Buying resale ticket", ticketId, "for", price, "ETH");
       const tx = await contract.buyResaleTicket(ticketId, { value: ethers.parseEther(price) });
       await tx.wait();
-      alert("✅ Resale ticket purchased successfully!");
-      router.push("/profile");
+      // Set modal with redirect flag on success
+      setModal({ show: true, message: "✅ Resale ticket purchased successfully!", redirect: true });
     } catch (error) {
       console.error("❌ Error buying resale ticket:", error);
-      alert("Failed to purchase resale ticket: " + error.message);
+      setModal({ show: true, message: "Failed to purchase resale ticket: " + error.message, redirect: false });
+    } finally {
+      setPaymentProcessing(false);
     }
   };
 
-  if (!account) return <p className="text-center text-white py-8">Please connect your wallet.</p>;
+  const closeModal = () => {
+    // if redirect flag is set, navigate after closing modal
+    if (modal.redirect) {
+      router.push("/profile");
+    }
+    setModal({ show: false, message: "", redirect: false });
+  };
+
+  // Loader for payment processing
+  if (paymentProcessing) {
+    return (
+      <div className="flex flex-col space-y-4 justify-center items-center bg-black h-screen">
+        <div className="flex space-x-2 justify-center items-center">
+          <span className="sr-only">Loading...</span>
+          <div className="h-8 w-8 bg-white rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+          <div className="h-8 w-8 bg-white rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+          <div className="h-8 w-8 bg-white rounded-full animate-bounce"></div>
+        </div>
+        <p className="text-white text-lg animate-pulse">Payment Processing...</p>
+      </div>
+    );
+  }
+
+  if (!account)
+    return <p className="text-center text-white py-8">Please connect your wallet.</p>;
   if (loading)
     return (
       <div className="flex flex-col space-y-4 justify-center items-center bg-black h-screen">
@@ -92,11 +122,16 @@ export default function ResaleTicketsPage() {
         <p className="text-white text-lg animate-pulse">Loading tickets for resale ...</p>
       </div>
     );
-  if (resaleTickets.length === 0) return <p className="text-center text-white py-8">No resale tickets available.</p>;
+  if (resaleTickets.length === 0)
+    return (
+      <div className="flex items-center justify-center bg-black h-screen">
+        <p className="text-white text-xl">No Tickets available for resale</p>
+      </div>
+    );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-black via-purple-950 to-black text-white px-8 py-8 pt-12">
-      <h1 className="flex items-center text-3xl font-bold mb-6">
+      <h1 className="flex items-center text-3xl font-bold mb-6 mt-14">
         <TicketIcon className="mr-2 h-8 w-8 text-orange-500" />
         Resale Tickets
       </h1>
@@ -150,6 +185,22 @@ export default function ResaleTicketsPage() {
           </div>
         ))}
       </div>
+
+      {/* Modal */}
+      {modal.show && (
+        <div className="fixed inset-0 flex items-center justify-center z-50">
+          <div className="fixed inset-0 bg-black opacity-50"></div>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 z-10 max-w-sm w-full">
+            <p className="text-gray-900 dark:text-gray-100 mb-4">{modal.message}</p>
+            <button
+              onClick={closeModal}
+              className="w-full px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
