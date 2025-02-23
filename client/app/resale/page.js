@@ -3,11 +3,13 @@ import { useState, useEffect, useContext } from "react";
 import { WalletContext } from "../context/WalletContext";
 import { ethers } from "ethers";
 import Link from "next/link";
+import { useRouter } from "next/navigation"; // For Next.js 13 app directory
 
 export default function ResaleTicketsPage() {
   const { account, provider, signer } = useContext(WalletContext);
   const [resaleTickets, setResaleTickets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     if (!provider) return;
@@ -74,8 +76,8 @@ export default function ResaleTicketsPage() {
       const tx = await contract.buyResaleTicket(ticketId, { value: ethers.parseEther(price) });
       await tx.wait();
       alert("✅ Resale ticket purchased successfully!");
-      // Refresh the list or reload the page to update the UI
-      window.location.reload();
+      // Redirect to the profile page after purchase
+      router.push("/profile");
     } catch (error) {
       console.error("❌ Error buying resale ticket:", error);
       alert("Failed to purchase resale ticket: " + error.message);

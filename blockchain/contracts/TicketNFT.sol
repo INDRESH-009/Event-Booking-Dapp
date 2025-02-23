@@ -37,6 +37,9 @@ contract TicketNFT is ERC721URIStorage, ERC721Enumerable, Ownable {
     mapping(uint256 => uint256) public resaleHistory; // Tracks how many times ticket is resold
     mapping(uint256 => bool) public isListedForResale;
     mapping(address => uint256[]) public organizerEvents;
+    mapping(address => uint256) public sellerBalances;
+    mapping(address => uint256) public organizerBalances;
+
 
     constructor() ERC721("EventTicket", "ETK") {
         ticketCounter = 0;
@@ -117,24 +120,29 @@ contract TicketNFT is ERC721URIStorage, ERC721Enumerable, Ownable {
     }
 
     /** 💰 Buy Resale Ticket */
-    function buyResaleTicket(uint256 ticketId) external payable {
-        uint256 price = resalePrices[ticketId];
-        require(price > 0, "Not for sale");
-        require(msg.value >= price, "Insufficient payment");
+    /** 💰 Buy Resale Ticket */
+function buyResaleTicket(uint256 ticketId) external payable {
+    uint256 price = resalePrices[ticketId];
+    require(price > 0, "Not for sale");
+    require(msg.value >= price, "Insufficient payment");
 
-        address seller = ownerOf(ticketId);
-        uint256 royalty = (price * ROYALTY_PERCENT) / 100;
-        payable(events[tickets[ticketId].eventId].organizer).transfer(royalty);
-        payable(seller).transfer(price - royalty);
-        
-        safeTransferFrom(seller, msg.sender, ticketId);
-        
-        resalePrices[ticketId] = 0;
-        isListedForResale[ticketId] = false;
+    address seller = ownerOf(ticketId);
+    uint256 royalty = (price * ROYALTY_PERCENT) / 100;
+// Credit the organizer’s balance
+organizerBalances[events[tickets[ticketId].eventId].organizer] += royalty;
+// Credit the seller’s balance
+sellerBalances[seller] += (price - royalty);
 
-        resaleHistory[ticketId] += 1; // Increment resale count
-        events[tickets[ticketId].eventId].totalResaleEarnings += royalty;
-    }
+    
+    // Use the internal transfer function to bypass the approval check.
+    _transfer(seller, msg.sender, ticketId);
+    
+    resalePrices[ticketId] = 0;
+    isListedForResale[ticketId] = false;
+
+    resaleHistory[ticketId] += 1; // Increment resale count
+    events[tickets[ticketId].eventId].totalResaleEarnings += royalty;
+}
 
     /** 📊 Fetch Resale Tickets */
     function getResaleTickets() external view returns (uint256[] memory) {
@@ -212,4 +220,20 @@ contract TicketNFT is ERC721URIStorage, ERC721Enumerable, Ownable {
     {
         return super.supportsInterface(interfaceId);
     }
+    function withdrawSellerFunds() external {
+    uint256 amount = sellerBalances[msg.sender];
+    require(amount > 0, "No funds to withdraw");
+    sellerBalances[msg.sender] = 0;
+    (bool success, ) = payable(msg.sender).call{value: amount}("");
+    require(success, "Withdrawal failed");
+}
+
+function withdrawOrganizerFunds() external {
+    uint256 amount = organizerBalances[msg.sender];
+    require(amount > 0, "No funds to withdraw");
+    organizerBalances[msg.sender] = 0;
+    (bool success, ) = payable(msg.sender).call{value: amount}("");
+    require(success, "Withdrawal failed");
+}
+
 }

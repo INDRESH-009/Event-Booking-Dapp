@@ -3,6 +3,11 @@ const approvalABI = [
   "function isApprovedForAll(address owner, address operator) external view returns (bool)",
   "function setApprovalForAll(address operator, bool approved) external"
 ];
+// ABI snippet to fetch withdrawal balances
+const balanceABI = [
+  "function sellerBalances(address) external view returns (uint256)",
+  "function organizerBalances(address) external view returns (uint256)"
+];
 
 import { useState, useEffect, useContext } from "react";
 import { WalletContext } from "../context/WalletContext.js";
@@ -17,6 +22,8 @@ export default function Profile() {
   const [resalePrice, setResalePrice] = useState({});
   const [loading, setLoading] = useState(true);
   const [hasApproval, setHasApproval] = useState(false);
+  const [sellerFunds, setSellerFunds] = useState("0");
+  const [organizerFunds, setOrganizerFunds] = useState("0");
 
 
   useEffect(() => {
@@ -114,6 +121,29 @@ export default function Profile() {
     fetchUserTicketsAndEvents();
   }, [account, provider]);
 
+  useEffect(() => {
+    if (!account || !provider) return;
+    
+    async function fetchBalances() {
+      try {
+        const balanceContract = new ethers.Contract(
+          process.env.NEXT_PUBLIC_CONTRACT_ADDRESS,
+          balanceABI,
+          provider
+        );
+        const sellerBalanceWei = await balanceContract.sellerBalances(account);
+        const organizerBalanceWei = await balanceContract.organizerBalances(account);
+        setSellerFunds(ethers.formatEther(sellerBalanceWei));
+        setOrganizerFunds(ethers.formatEther(organizerBalanceWei));
+      } catch (error) {
+        console.error("Error fetching balances:", error);
+      }
+    }
+    
+    fetchBalances();
+  }, [account, provider]);
+
+
   const handleSetApprovalForAll = async () => {
     try {
       console.log("📢 Setting global approval for contract...");
@@ -131,6 +161,42 @@ export default function Profile() {
     } catch (error) {
       console.error("❌ Error setting approval:", error);
       alert("⚠️ Failed to set approval.");
+    }
+  };
+  const handleWithdrawSellerFunds = async () => {
+    try {
+      // Create a contract instance with the ABI for the seller withdrawal function
+      const contract = new ethers.Contract(
+        process.env.NEXT_PUBLIC_CONTRACT_ADDRESS,
+        [
+          "function withdrawSellerFunds() external"
+        ],
+        signer
+      );
+      const tx = await contract.withdrawSellerFunds();
+      await tx.wait();
+      alert("Seller withdrawal successful!");
+    } catch (error) {
+      console.error("Withdrawal failed", error);
+      alert("Withdrawal failed!");
+    }
+  };
+  const handleWithdrawOrganizerFunds = async () => {
+    try {
+      // Create a contract instance with the ABI for the organizer withdrawal function
+      const contract = new ethers.Contract(
+        process.env.NEXT_PUBLIC_CONTRACT_ADDRESS,
+        [
+          "function withdrawOrganizerFunds() external"
+        ],
+        signer
+      );
+      const tx = await contract.withdrawOrganizerFunds();
+      await tx.wait();
+      alert("Organizer withdrawal successful!");
+    } catch (error) {
+      console.error("Organizer withdrawal failed", error);
+      alert("Organizer withdrawal failed!");
     }
   };
   
@@ -262,8 +328,17 @@ export default function Profile() {
 
             </div>
           ))}
+
+
         </div>
-      )}
+        
+      )}1
+
+
+
+
+
+
 
 <h1 style={{ marginTop: "30px" }}>🎭 Your Events</h1>
 {organizerEvents.length === 0 ? (
@@ -342,7 +417,42 @@ export default function Profile() {
   </button>
 </Link>
 
-
+<h2 style={{ marginTop: "30px" }}>My Withdrawal Balances</h2>
+      <div style={{ marginBottom: "20px" }}>
+        <p><strong>Seller Funds:</strong> {sellerFunds} ETH</p>
+        <button
+          onClick={handleWithdrawSellerFunds}
+          disabled={parseFloat(sellerFunds) === 0}
+          style={{
+            padding: "10px",
+            backgroundColor: parseFloat(sellerFunds) === 0 ? "#ccc" : "#28a745",
+            color: "white",
+            border: "none",
+            borderRadius: "5px",
+            cursor: parseFloat(sellerFunds) === 0 ? "not-allowed" : "pointer",
+            marginRight: "10px"
+          }}
+        >
+          Withdraw Seller Funds
+        </button>
+      </div>
+      <div style={{ marginBottom: "20px" }}>
+        <p><strong>Organizer Funds:</strong> {organizerFunds} ETH</p>
+        <button
+          onClick={handleWithdrawOrganizerFunds}
+          disabled={parseFloat(organizerFunds) === 0}
+          style={{
+            padding: "10px",
+            backgroundColor: parseFloat(organizerFunds) === 0 ? "#ccc" : "#007bff",
+            color: "white",
+            border: "none",
+            borderRadius: "5px",
+            cursor: parseFloat(organizerFunds) === 0 ? "not-allowed" : "pointer"
+          }}
+        >
+          Withdraw Organizer Funds
+        </button>
+      </div>
     </div>
   );
 }
