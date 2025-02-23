@@ -117,8 +117,8 @@ export default function OrganizeEvent() {
   };
 
   return (
-    <div className="min-h-screen p-4 md:p-8 bg-black">
-      <Card className="max-w-2xl mx-auto bg-gray-900 border border-gray-700 shadow-lg">
+    <div className="min-h-screen p-4 md:p-8 bg-gradient-to-br from-black via-purple-950 to-black">
+      <Card className="max-w-2xl mx-auto bg-black border-none shadow-lg">
         <CardHeader>
           <CardTitle className="text-3xl font-bold text-center text-white">
             Organize an Event

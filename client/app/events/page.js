@@ -1,5 +1,5 @@
 "use client";
-import { useContext, useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
 import { WalletContext } from "../context/WalletContext";
 import Link from "next/link";
 import { ethers } from "ethers";
@@ -12,6 +12,7 @@ export default function EventsPage() {
   const { account, provider } = useContext(WalletContext);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     if (!provider) return;
@@ -36,7 +37,7 @@ export default function EventsPage() {
           console.log(`📢 Fetching details for Event ID ${i}...`);
           const eventData = await contract.events(i);
           const [name, description, venue, ticketPrice, maxTickets, ticketsSold, eventDate, bannerImage] = eventData;
-          
+
           fetchedEvents.push({
             id: i,
             name,
@@ -63,19 +64,37 @@ export default function EventsPage() {
   }, [provider]);
 
   if (!account) return <p>Please connect your wallet.</p>;
-  if (loading) return <p>Loading events...</p>;
+  if (loading)
+    return (
+      <div className="flex flex-col space-y-4 justify-center items-center bg-black h-screen">
+        <div className="flex space-x-2 justify-center items-center">
+          <span className="sr-only">Loading...</span>
+          <div className="h-8 w-8 bg-white rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+          <div className="h-8 w-8 bg-white rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+          <div className="h-8 w-8 bg-white rounded-full animate-bounce"></div>
+        </div>
+        <p className="text-white text-lg animate-pulse">Loading Events ...</p>
+      </div>
+    );
+
+  // Filter events by search term (title)
+  const filteredEvents = events.filter((event) =>
+    event.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen pt-20 bg-gradient-to-br from-black via-purple-950 to-black text-white">
       <div className="px-8">
         {/* Search and Filter */}
-        <section className="py-8 px-4">
+        <section className="py-8 px-8">
           <div className="container mx-auto">
             <div className="flex flex-col md:flex-row gap-4">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <Input
                   placeholder="Search events..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-gray-400"
                 />
               </div>
@@ -95,14 +114,16 @@ export default function EventsPage() {
         </section>
 
         {/* Events Grid */}
-        <section className="py-8 px-4">
+        <section className="py-4 px-8">
           <div className="container mx-auto">
-            {events.length === 0 ? (
-              <p>No events found.</p>
+            {filteredEvents.length === 0 ? (
+              <div className="flex justify-center items-center h-64">
+                <p className="text-center text-gray-300 text-xl">No events found matching your search.</p>
+              </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {events.map((event) => (
-                  <div key={event.id} className="group relative bg-white/5 rounded-xl overflow-hidden hover:bg-white/10 transition-all">
+                {filteredEvents.map((event) => (
+                  <div key={event.id} className="group relative rounded-xl overflow-hidden bg-black/40 backdrop-blur-xl transition-all hover:bg-black/60">
                     <div className="aspect-[4/3] relative">
                       <img
                         src={event.image || "/placeholder.svg?height=300&width=400"}

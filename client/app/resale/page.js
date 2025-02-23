@@ -4,6 +4,7 @@ import { WalletContext } from "../context/WalletContext";
 import { ethers } from "ethers";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Ticket as TicketIcon, Calendar as CalendarIcon, MapPin, DollarSign, Hash } from "lucide-react";
 
 export default function ResaleTicketsPage() {
   const { account, provider, signer } = useContext(WalletContext);
@@ -79,42 +80,76 @@ export default function ResaleTicketsPage() {
   };
 
   if (!account) return <p className="text-center text-white py-8">Please connect your wallet.</p>;
-  if (loading) return <p className="text-center text-white py-8">Loading resale tickets...</p>;
+  if (loading)
+    return (
+      <div className="flex flex-col space-y-4 justify-center items-center bg-black h-screen">
+        <div className="flex space-x-2 justify-center items-center">
+          <span className="sr-only">Loading...</span>
+          <div className="h-8 w-8 bg-white rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+          <div className="h-8 w-8 bg-white rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+          <div className="h-8 w-8 bg-white rounded-full animate-bounce"></div>
+        </div>
+        <p className="text-white text-lg animate-pulse">Loading tickets for resale ...</p>
+      </div>
+    );
   if (resaleTickets.length === 0) return <p className="text-center text-white py-8">No resale tickets available.</p>;
 
   return (
-    <div className="min-h-screen bg-black text-white px-8 py-8">
-      <h1 className="text-3xl font-bold mb-6">Resale Tickets</h1>
+    <div className="min-h-screen bg-gradient-to-br from-black via-purple-950 to-black text-white px-8 py-8 pt-12">
+      <h1 className="flex items-center text-3xl font-bold mb-6">
+        <TicketIcon className="mr-2 h-8 w-8 text-orange-500" />
+        Resale Tickets
+      </h1>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {resaleTickets.map((ticket) => (
-          <div key={ticket.ticketId} className="bg-gray-800 rounded-xl shadow-lg p-4">
+          <div key={ticket.ticketId} className="bg-black/40 backdrop-blur-xl transition-all hover:bg-black/60 rounded-xl shadow-lg p-4">
             <img
               src={ticket.bannerImage}
               alt={ticket.eventName}
               className="w-full h-44 object-cover rounded-lg mb-4"
             />
             <h2 className="text-xl font-semibold mb-2">{ticket.eventName}</h2>
-            <p className="text-sm mb-1"><strong>Ticket ID:</strong> {ticket.ticketId}</p>
-            <p className="text-sm mb-1"><strong>Event ID:</strong> {ticket.eventId}</p>
-            <p className="text-sm mb-1"><strong>Venue:</strong> {ticket.venue}</p>
-            <p className="text-sm mb-1"><strong>Event Date:</strong> {ticket.eventDate}</p>
-            <p className="text-sm mb-1"><strong>Resale Price:</strong> {ticket.resalePrice} ETH</p>
+            <div className="space-y-1 text-sm">
+              <div className="flex items-center gap-2">
+                <TicketIcon className="h-4 w-4 text-purple-400" />
+                <span>
+                  <strong>Ticket ID:</strong> {ticket.ticketId}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Hash className="h-4 w-4 text-purple-400" />
+                <span>
+                  <strong>Event ID:</strong> {ticket.eventId}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-purple-400" />
+                <span>
+                  <strong>Venue:</strong> {ticket.venue}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <CalendarIcon className="h-4 w-4 text-purple-400" />
+                <span>
+                  <strong>Event Date:</strong> {ticket.eventDate}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-purple-400" />
+                <span>
+                  <strong>Resale Price:</strong> {ticket.resalePrice} ETH
+                </span>
+              </div>
+            </div>
             <button
               onClick={() => buyResaleTicket(ticket.ticketId, ticket.resalePrice)}
-              className="w-full px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded"
+              className="w-full px-4 py-2 bg-pink-500 hover:bg-pink-600 text-white rounded mt-4"
             >
               Buy Resale Ticket
             </button>
           </div>
         ))}
       </div>
-      {/* <div className="mt-8">
-        <Link href="/profile">
-          <button className="w-full px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded">
-            Back to Profile
-          </button>
-        </Link>
-      </div> */}
     </div>
   );
 }

@@ -3,7 +3,14 @@ import { useState, useEffect, useContext } from "react";
 import { WalletContext } from "../context/WalletContext.js";
 import { ethers } from "ethers";
 import Link from "next/link";
-import { QRCodeCanvas } from "qrcode.react"; // Import the QRCode component
+import { QRCodeCanvas } from "qrcode.react";
+
+// Import UI components and icons from your design library
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Calendar, Clock, Coins, MapPin, QrCode, Ticket as TicketIcon, Wallet as WalletIcon, DollarSign } from "lucide-react";
+import Image from "next/image";
 
 const approvalABI = [
   "function isApprovedForAll(address owner, address operator) external view returns (bool)",
@@ -226,157 +233,241 @@ export default function Profile() {
     }
   };
 
-  if (loading) return <p className="text-center text-white py-8">⏳ Loading your profile...</p>;
-  if (!account) return <p className="text-center text-white py-8">❌ Please connect your wallet.</p>;
+  if (loading)
+    return (
+      <div className="flex flex-col space-y-4 justify-center items-center bg-black h-screen">
+        <div className="flex space-x-2 justify-center items-center">
+          <span className="sr-only">Loading...</span>
+          <div className="h-8 w-8 bg-white rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+          <div className="h-8 w-8 bg-white rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+          <div className="h-8 w-8 bg-white rounded-full animate-bounce"></div>
+        </div>
+        <p className="text-white text-lg animate-pulse">Loading your profile ...</p>
+      </div>
+    );
+  if (!account)
+    return <p className="text-center text-white py-8">❌ Please connect your wallet.</p>;
 
   return (
-    <div className="min-h-screen bg-black text-white px-8 py-8">
-      {/* Your Tickets Section */}
-      <h1 className="text-3xl font-bold mb-6">🎟 Your Tickets</h1>
-      {tickets.length === 0 ? (
-        <p className="text-center">❌ You haven't bought any tickets yet.</p>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {tickets.map((ticket) => (
-            <div key={ticket.id} className="bg-gray-800 rounded-xl shadow-lg overflow-hidden p-4">
-              <img
-                src={ticket.eventImage}
-                alt={ticket.eventName}
-                className="w-full h-44 object-cover rounded-lg mb-4"
-              />
-              <h2 className="text-xl font-semibold mb-2">{ticket.eventName}</h2>
-              <p className="text-sm mb-1"><strong>Ticket ID:</strong> {ticket.id}</p>
-              <p className="text-sm mb-1"><strong>Event ID:</strong> {ticket.eventId}</p>
-              <p className="text-sm mb-1"><strong>Venue:</strong> {ticket.venue}</p>
-              <p className="text-sm mb-1"><strong>Event Date:</strong> {ticket.eventDate}</p>
-              <p className="text-sm mb-1"><strong>Purchase Date:</strong> {ticket.purchaseDate}</p>
-              <p className="text-sm mb-1">
-                <strong>Status:</strong> {ticket.used ? "❌ Used" : "✅ Valid"}
-              </p>
-              <p className="text-sm mb-1">
-                <strong>Transaction:</strong>{" "}
-                <a
-                  href={`https://sepolia.etherscan.io/tx/${ticket.transactionHash}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-400 underline"
-                >
-                  {ticket.transactionHash}
-                </a>
-              </p>
-              {/* QR Code for the transaction */}
-              <div className="my-4 flex justify-center">
-                <QRCodeCanvas
-                  value={`https://sepolia.etherscan.io/tx/${ticket.transactionHash}`}
-                  size={128}
-                  bgColor="#ffffff"
-                  fgColor="#000000"
-                />
-              </div>
-              {ticket.resalePrice ? (
-                <p className="text-sm mb-1"><strong>Resale Price:</strong> {ticket.resalePrice} ETH</p>
-              ) : (
-                <>
-                  {!hasApproval && (
-                    <button
-                      onClick={handleSetApprovalForAll}
-                      className="w-full mt-2 px-3 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded"
-                    >
-                      Approve for Resale
-                    </button>
-                  )}
-                  {hasApproval && (
-                    <>
-                      <input
-                        type="number"
-                        placeholder="Set resale price (ETH)"
-                        className="w-full border border-gray-500 p-2 rounded my-2 bg-gray-700 text-white"
-                        value={resalePrice[ticket.id] || ""}
-                        onChange={(e) => setResalePrice({ ...resalePrice, [ticket.id]: e.target.value })}
+    <div className="min-h-screen bg-gradient-to-br from-black via-purple-950 to-black p-6 pt-14">
+      <div className="mx-auto max-w-7xl space-y-8">
+        {/* Your Tickets Section */}
+        <section className="space-y-4">
+          <div className="flex items-center gap-2">
+            <TicketIcon className="h-6 w-6 text-purple-400" />
+            <h2 className="text-2xl font-bold text-white">Your Tickets</h2>
+          </div>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {tickets.length === 0 ? (
+              <p className="text-center text-white">❌ You haven't bought any tickets yet.</p>
+            ) : (
+              tickets.map((ticket) => (
+                <Card key={ticket.id} className="group relative overflow-hidden border-0 bg-black/40 backdrop-blur-xl transition-all hover:bg-black/60">
+                  <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-transparent" />
+                  <CardHeader className="relative">
+                    <div className="relative h-48 overflow-hidden rounded-lg">
+                      <Image
+                        src={ticket.eventImage}
+                        alt={ticket.eventName}
+                        className="object-cover transition-transform duration-500 group-hover:scale-110"
+                        fill
                       />
-                      <button
-                        onClick={() => handleListForResale(ticket.id)}
-                        className="w-full mt-2 px-3 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded"
-                      >
-                        List for Resale
-                      </button>
-                    </>
-                  )}
-                </>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-  
-      {/* Your Events Section */}
-      <h1 className="text-3xl font-bold my-8">🎭 Your Events</h1>
-      {organizerEvents.length === 0 ? (
-        <p className="text-center">You haven't organized any events yet.</p>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {organizerEvents.map((event) => (
-            <div key={event.id} className="bg-gray-800 rounded-xl shadow-lg overflow-hidden p-4">
-              <img
-                src={event.image}
-                alt={event.name}
-                className="w-full h-44 object-cover rounded-lg mb-4"
-              />
-              <h2 className="text-xl font-semibold mb-2">{event.name}</h2>
-              <p className="text-sm mb-1"><strong>Ticket Price:</strong> {event.ticketPrice}</p>
-              <p className="text-sm mb-1"><strong>Venue:</strong> {event.venue}</p>
-              <p className="text-sm mb-1"><strong>Date:</strong> {event.eventDate}</p>
-              <p className="text-sm mb-1">
-                <strong>Tickets Sold:</strong> {event.ticketsSold} / {event.maxTickets}
-              </p>
-              <Link href={`/dashboard/${event.id}`} className="block mt-3">
-                <button className="w-full px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded">
-                  Dashboard
-                </button>
-              </Link>
-            </div>
-          ))}
-        </div>
-      )}
-  
-      {/* My Withdrawal Balances Heading */}
-      <h2 className="text-2xl font-bold my-6">My Withdrawal Balances</h2>
-  
-      {/* Grouped Withdrawal and Organize Event Section */}
-      <div className="flex flex-col md:flex-row gap-6">
-        <div className="flex-1 bg-gray-800 rounded-xl shadow-lg p-4 flex flex-col justify-between">
-          <p className="text-lg mb-4"><strong>Seller Funds:</strong> {sellerFunds} ETH</p>
-          <button
-            onClick={handleWithdrawSellerFunds}
-            disabled={parseFloat(sellerFunds) === 0}
-            className={`w-full px-4 py-2 rounded ${
-              parseFloat(sellerFunds) === 0 ? "bg-gray-500 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"
-            } text-white`}
-          >
-            Withdraw Seller Funds
-          </button>
-        </div>
-        <div className="flex-1 bg-gray-800 rounded-xl shadow-lg p-4 flex flex-col justify-between">
-          <p className="text-lg mb-4"><strong>Organizer Funds:</strong> {organizerFunds} ETH</p>
-          <button
-            onClick={handleWithdrawOrganizerFunds}
-            disabled={parseFloat(organizerFunds) === 0}
-            className={`w-full px-4 py-2 rounded ${
-              parseFloat(organizerFunds) === 0 ? "bg-gray-500 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
-            } text-white`}
-          >
-            Withdraw Organizer Funds
-          </button>
-        </div>
-        <div className="flex-1 bg-gray-800 rounded-xl shadow-lg p-4 flex flex-col justify-center items-center">
-          <Link href="/organize" className="w-full">
-            <button className="w-full px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded">
-              ➕ Organize an Event
-            </button>
-          </Link>
-        </div>
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                    </div>
+                  </CardHeader>
+                  <CardContent className="relative space-y-4">
+                    <div>
+                      <h3 className="text-xl font-bold text-white">{ticket.eventName}</h3>
+                      <Badge variant="secondary" className={`mt-2 ${ticket.used ? "bg-red-500/20 text-red-200" : "bg-green-500/20 text-green-200"}`}>
+                        {ticket.used ? "Used" : "Valid"}
+                      </Badge>
+                    </div>
+                    <div className="grid gap-2 text-sm text-gray-300">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-purple-400" />
+                        {ticket.eventDate}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-purple-400" />
+                        {ticket.venue}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <TicketIcon className="h-4 w-4 text-purple-400" />
+                        Ticket ID: {ticket.id}
+                      </div>
+                    </div>
+                    <div className="flex justify-center pt-4">
+                      <div className="group relative">
+                        <div className="absolute -inset-1 animate-pulse rounded-lg bg-purple-500/20 blur-lg transition-all group-hover:bg-purple-500/30" />
+                        <QRCodeCanvas
+                          value={`https://sepolia.etherscan.io/tx/${ticket.transactionHash}`}
+                          size={96}
+                          bgColor="#ffffff"
+                          fgColor="#000000"
+                        />
+                      </div>
+                    </div>
+                  </CardContent>
+                  <CardFooter className="relative">
+                    {ticket.resalePrice ? (
+                      <p className="text-sm text-purple-300">Resale Price: {ticket.resalePrice} ETH</p>
+                    ) : (
+                      <>
+                        {!hasApproval ? (
+                          <Button
+                            onClick={handleSetApprovalForAll}
+                            className="w-full bg-purple-500 text-white hover:bg-purple-600"
+                            variant="secondary"
+                          >
+                            Approve for Resale
+                          </Button>
+                        ) : (
+                          <div className="flex flex-col gap-2 w-full">
+                            <input
+                              type="number"
+                              placeholder="Set resale price (ETH)"
+                              className="w-full border border-gray-500 p-2 rounded bg-gray-700 text-white"
+                              value={resalePrice[ticket.id] || ""}
+                              onChange={(e) =>
+                                setResalePrice({ ...resalePrice, [ticket.id]: e.target.value })
+                              }
+                            />
+                            <Button
+                              onClick={() => handleListForResale(ticket.id)}
+                              className="w-full bg-orange-500 hover:bg-orange-600 text-white"
+                            >
+                              List for Resale
+                            </Button>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </CardFooter>
+                </Card>
+              ))
+            )}
+          </div>
+        </section>
+
+        {/* Your Events Section */}
+        <section className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-6 w-6 text-purple-400" />
+            <h2 className="text-2xl font-bold text-white">Your Events</h2>
+          </div>
+          {organizerEvents.length === 0 ? (
+            <p className="text-center text-white">You haven't organized any events yet.</p>
+          ) : (
+            organizerEvents.map((event) => (
+              <Card key={event.id} className="border-0 bg-black/40 backdrop-blur-xl">
+                <CardContent className="flex flex-col md:flex-row items-stretch p-6 gap-6">
+                  {/* Image Section */}
+                  <div className="relative h-48 md:h-auto md:flex-1 overflow-hidden rounded-lg">
+                    <Image
+                      src={event.image}
+                      alt={event.name}
+                      className="object-cover transition-transform duration-500"
+                      fill
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 to-transparent" />
+                  </div>
+                  {/* Details Section */}
+                  <div className="flex flex-col justify-between md:flex-1">
+                    <div>
+                      <h3 className="text-xl font-bold text-white">{event.name}</h3>
+                      <p className="text-sm text-gray-400">Organizer Dashboard</p>
+                    </div>
+                    <div className="grid gap-2 text-sm text-gray-300 mt-4">
+                      <div className="flex items-center gap-2">
+                        <Coins className="h-4 w-4 text-purple-400" />
+                        Price: {event.ticketPrice}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-purple-400" />
+                        {event.venue}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-purple-400" />
+                        {event.eventDate}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <TicketIcon className="h-4 w-4 text-purple-400" />
+                        Tickets Sold: {event.ticketsSold} / {event.maxTickets}
+                      </div>
+                    </div>
+                    <Link href={`/dashboard/${event.id}`} className="mt-4">
+                      <Button className="w-full bg-purple-500 text-white hover:bg-purple-600">
+                        View Dashboard
+                      </Button>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </section>
+
+        {/* Withdrawal Balances Section */}
+        <section className="space-y-4">
+          <div className="flex items-center gap-2">
+            <WalletIcon className="h-6 w-6 text-purple-400" />
+            <h2 className="text-2xl font-bold text-white">My Withdrawal Balances</h2>
+          </div>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <Card className="border-0 bg-black/40 backdrop-blur-xl">
+              <CardHeader>
+                <CardTitle className="text-white">Seller Funds</CardTitle>
+              </CardHeader>
+              <CardContent className="flex items-center gap-2">
+                <p className="text-2xl font-bold text-purple-400">{sellerFunds}</p>
+                <Badge variant="secondary" className="bg-purple-500/20 text-purple-200">ETH</Badge>
+                <DollarSign className="h-4 w-4 text-purple-400" />
+              </CardContent>
+              <CardFooter>
+                <Button
+                  onClick={handleWithdrawSellerFunds}
+                  className="w-full bg-purple-500/20 backdrop-blur-sm transition-colors hover:bg-purple-500/40"
+                  variant="secondary"
+                  disabled={parseFloat(sellerFunds) === 0}
+                >
+                  Withdraw Seller Funds
+                </Button>
+              </CardFooter>
+            </Card>
+            <Card className="border-0 bg-black/40 backdrop-blur-xl">
+              <CardHeader>
+                <CardTitle className="text-white">Organizer Funds</CardTitle>
+              </CardHeader>
+              <CardContent className="flex items-center gap-2">
+                <p className="text-2xl font-bold text-purple-400">{organizerFunds}</p>
+                <Badge variant="secondary" className="bg-purple-500/20 text-purple-200">ETH</Badge>
+                <DollarSign className="h-4 w-4 text-purple-400" />
+              </CardContent>
+              <CardFooter>
+                <Button
+                  onClick={handleWithdrawOrganizerFunds}
+                  className="w-full bg-purple-500 text-white hover:bg-purple-600"
+                  disabled={parseFloat(organizerFunds) === 0}
+                >
+                  Withdraw Organizer Funds
+                </Button>
+              </CardFooter>
+            </Card>
+            <Card className="border-0 bg-black/40 backdrop-blur-xl">
+              <CardHeader>
+                <CardTitle className="text-white">Quick Actions</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Link href="/organize" className="w-full">
+                  <Button className="w-full bg-green-500 text-white hover:bg-green-600">
+                    Organize an Event
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
       </div>
     </div>
   );
-  
 }
