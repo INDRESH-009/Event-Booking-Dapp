@@ -4,3 +4,8 @@ node_modules
 .next/
 # Node modules
 node_modules/
+# Next.js build output
+.next
+# Node modules
+node_modules/
+/Users/indreshmr/event-booking/client/.next
