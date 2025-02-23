@@ -1,3 +1,4 @@
+import "./globals.css"
 import { WalletProvider } from "./context/WalletContext";
 import Navbar from "./components/Navbar";
 
